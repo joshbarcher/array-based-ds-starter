@@ -1,9 +1,8 @@
 import adts.IQueue;
-import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.util.NoSuchElementException;
+import java.util.*;
 
 import static org.junit.Assert.*;
 
@@ -17,11 +16,11 @@ import static org.junit.Assert.*;
  */
 public class QueueTest
 {
+    private Random random = new Random();
     private IQueue queue;
 
     //test elements
-    private int[] testArray = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
-    private int[] missing = {11, 12, 13};
+    private Set<Integer> missingElements = Set.of(11, 12, 13);
 
     /*
         This method should create and return a new queue
@@ -48,8 +47,8 @@ public class QueueTest
     @Test
     public void capacityAccurateTest()
     {
-        assertEquals("Capacity inaccurate when creating a queue with capacity 5",
-                            10, queue.getCurrentCapacity());
+        assertNotEquals("Capacity inaccurate when creating an empty queue",
+                            0, queue.getCurrentCapacity());
     }
 
     /**
@@ -58,11 +57,11 @@ public class QueueTest
     @Test
     public void fullQueueResizesTest()
     {
-        addElementsToFullQueue();
+        List<Integer> added = addElementsToFullQueue();
 
-        //one too many for a queue of size 5
-        queue.add(11);
-        assertEquals(11, queue.size());
+        //add one more after reaching the capacity (to force a resize)
+        queue.add(99);
+        assertEquals(added.size() + 1, queue.size());
     }
 
     /**
@@ -82,12 +81,12 @@ public class QueueTest
     @Test
     public void removeTest()
     {
-        addElementsToFullQueue();
+        List<Integer> added = addElementsToFullQueue();
 
         //remove the element
         int removed = (int)queue.remove();
         assertEquals("Added a single element, but didn't receive the " +
-                            "element with remove()", 1, removed);
+                            "element with remove()", added.get(0).intValue(), removed);
     }
 
     /**
@@ -96,13 +95,13 @@ public class QueueTest
     @Test
     public void fifoTest()
     {
-        addElementsToFullQueue();
+        List<Integer> added = addElementsToFullQueue();
 
         //make sure elements removed are in FIFO order
-        for (int i = 0; i < testArray.length; i++)
+        for (int i = 0; i < added.size(); i++)
         {
             assertEquals("Removed element does not match FIFO order",
-                                testArray[i], queue.remove());
+                    added.get(i).intValue(), queue.remove());
         }
     }
 
@@ -113,13 +112,13 @@ public class QueueTest
     @Test
     public void containsExistsTest()
     {
-        addElementsToFullQueue();
+        List<Integer> added = addElementsToFullQueue();
 
         //make sure elements are discoverable
-        for (int i = 0; i < testArray.length; i++)
+        for (int i = 0; i < added.size(); i++)
         {
             assertTrue("Added element not discoverable by contains()",
-                                queue.contains(testArray[i]));
+                                queue.contains(added.get(i).intValue()));
         }
     }
 
@@ -133,10 +132,10 @@ public class QueueTest
         addElementsToFullQueue();
 
         //make sure elements are discoverable
-        for (int i = 0; i < missing.length; i++)
+        for (int element : missingElements)
         {
             assertFalse("Missing element is discoverable by contains()",
-                                queue.contains(missing[i]));
+                                queue.contains(element));
         }
     }
 
@@ -186,12 +185,13 @@ public class QueueTest
     @Test
     public void sizeTest()
     {
-        addElementsToPartialQueue();
+        List<Integer> added = addElementsToPartialQueue();
 
         //queue should be empty to start with
         assertEquals("Queue size not correct after a few calls to add()",
-                            testArray.length / 2, queue.size());
+                added.size(), queue.size());
         assertFalse("Queue should not be empty after calling add()", queue.isEmpty());
+        assertFalse("A partially filled queue should not be full", queue.isFull());
     }
 
     /**
@@ -202,19 +202,6 @@ public class QueueTest
     {
         assertTrue("Empty queue should be empty", queue.isEmpty());
         assertFalse("An empty queue should not be full", queue.isFull());
-    }
-
-    /**
-     * Verifies that isFull() reports correctly for a partially full queue.
-     */
-    @Test
-    public void semiFullTest()
-    {
-        addElementsToPartialQueue();
-
-        assertEquals("Queue size not correct after a few calls to add()",
-                            testArray.length / 2, queue.size());
-        assertFalse("A partially filled queue should not be full", queue.isFull());
     }
 
     /**
@@ -320,9 +307,9 @@ public class QueueTest
     @Test
     public void addAfterEmptyingQueueTest()
     {
-        addElementsToFullQueue();
+        List<Integer> added = addElementsToFullQueue();
 
-        for (int i = 0; i < testArray.length; i++)
+        for (int i = 0; i < added.size(); i++)
         {
             queue.remove();
         }
@@ -335,27 +322,44 @@ public class QueueTest
                             queue.contains(8));
     }
 
-    private void addElementsToFullQueue()
+    private List<Integer> addElementsToFullQueue()
     {
-        for (int i = 0; i < testArray.length; i++)
-        {
-            queue.add(testArray[i]);
-        }
-        assertEquals("The size of your queue should be " + testArray.length +
-                            " after calling add() " + testArray.length + " times",
-                            testArray.length, queue.size());
+        int capacity = queue.getCurrentCapacity();
+        return addElements(capacity);
     }
 
-    private void addElementsToPartialQueue()
+    private List<Integer> addElementsToPartialQueue()
     {
-        int length = (testArray.length / 2);
-        for (int i = 0; i < testArray.length / 2; i++)
+        int capacity = queue.getCurrentCapacity();
+        int elements = capacity / 2;
+        return addElements(elements);
+    }
+
+    private List<Integer> addElements(int number)
+    {
+        List<Integer> addedElements = new ArrayList<>();
+
+        for (int i = 0; i < number; i++)
         {
-            queue.add(testArray[i]);
+            int element = getRandomElement();
+            queue.add(element);
+            addedElements.add(element);
         }
-        assertEquals("The size of your queue should be " + length +
-                            " after calling add() " + length + " times",
-                            length, queue.size());
+        assertEquals("The size of your queue should be " + number +
+                        " after calling add() " + number + " times",
+                number, queue.size());
+
+        return addedElements;
+    }
+
+    private int getRandomElement()
+    {
+        int result;
+        do
+        {
+            result = random.nextInt();
+        } while (missingElements.contains(result));
+        return result;
     }
 }
 
